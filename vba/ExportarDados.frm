@@ -1,7 +1,7 @@
 VERSION 5.00
 Begin {C62A69F0-16DC-11CE-9E98-00AA00574A4F} ExportarDados 
    Caption         =   "UserForm1"
-   ClientHeight    =   3588
+   ClientHeight    =   4488
    ClientLeft      =   108
    ClientTop       =   456
    ClientWidth     =   9012.001
@@ -127,18 +127,31 @@ Private Sub SubstituirCamposArquivoWord(pathModel As String, fields As Object, d
 End Sub
 
 Private Sub exportarDados_Click()
+    Dim nomeArquivo As String
+    Dim c As Control
+    
     ' Verificações
-    If chaves.Value = "" Or Not IsRangeValido(chaves.Value) Or valores.Value = "" Or Not IsRangeValido(valores.Value) Or _
-       dirOut.Value = "" Or pathTemplateWord.Value = "" Then
-        MsgBox "Necessário preenchimento de todos os campos para prosseguir!", vbExclamation: Exit Sub
-    End If
+    For Each c In Me.Controls
+        If TypeName(c) = "TextBox" Then
+            If c.Value = "" Then
+                MsgBox "Necessário preenchimento de todos os campos para prosseguir!", vbExclamation
+                c.BackColor = RGB(255, 163, 163)
+                Exit Sub
+            Else
+                c.BackColor = RGB(255, 255, 255)
+            End If
+        End If
+    Next c
     
     ' Inicia o dicionario
     IniciarDicionario
     
+    ' Verifica se o nome do arquivo é valido
+    nomeArquivo = nomeArquivoGerado.Value & "_" & Format(Now, "ddmmyyyy_hhmm")
+    
+    If Not IsFileNameValid(nomeArquivo) Then MsgBox "O nome do arquivo informado não é válido!", vbExclamation: Exit Sub
+    
     ' Inicia o procedimento de exportação
-    Dim nomeArquivo As String
-    nomeArquivo = "exported_file_" & Format(Now, "ddmmyyyy_hhmm")
     SubstituirCamposArquivoWord pathTemplateWord, dic, dirOut.Value, nomeArquivo
     
     ' Conclusão
@@ -214,16 +227,17 @@ Private Sub selectCamposValues_Click()
 End Sub
 
 Private Sub UserForm_Initialize()
+    Dim i As Long, ws As Worksheet
+    
     ' Formata o formulário
     FormatarFormulario Me
     
     ' Inicia os campos
     On Error Resume Next
     With ThisWorkbook.Worksheets("__tempSheet__")
-        pathTemplateWord.Value = .range("A1").Value
-        dirOut.Value = CorrigirEndereco(.range("A2").Value)
-        chaves.Value = CorrigirEndereco(.range("A3").Value)
-        valores.Value = CorrigirEndereco(.range("A4").Value)
+        For i = 1 To .Cells(Rows.Count, "A").End(xlUp).Row
+            Me.Controls(.Cells(i, "A").Value).Value = .Cells(i, "B").Value
+        Next i
     End With
     On Error GoTo 0
     
@@ -232,6 +246,9 @@ Private Sub UserForm_Initialize()
     
     ' Caption
     Me.Caption = "ExWord System v1.0"
+    
+    ' Tab order
+    Me.SetDefaultTabOrder
 End Sub
 Private Sub IniciarDicionario()
     Dim arChaves As Variant
@@ -250,8 +267,8 @@ Private Sub IniciarDicionario()
     #End If
     
     ' Atribui as chaves e valores
-    arChaves = range(chaves.Value)
-    arValores = range(valores.Value)
+    arChaves = range(CorrigirEndereco(chaves.Value))
+    arValores = range(CorrigirEndereco(valores.Value))
     
     j = LBound(arChaves, 2)
     
@@ -426,7 +443,7 @@ Function PegarCaminho(MsoTipo As Long, titulo As String, SelecaoMultipla As Bool
             End With
         End If
         
-        .show
+        .Show
         If .SelectedItems.Count = 0 Then
             PegarCaminho = ""
             Exit Function
@@ -471,28 +488,25 @@ Private Sub UserForm_QueryClose(Cancel As Integer, CloseMode As Integer)
     ' Cria uma planilha, se não existir, temporária com os campos deste userform
     Dim wsAtiva As Worksheet
     Dim wsTemp As Worksheet
+    Dim c As Control
+    Dim i As Long
     
     Set wsAtiva = ActiveSheet
-
-    On Error Resume Next
     If sheetIndex("__tempSheet__") = 0 Then
         Set wsTemp = ThisWorkbook.Worksheets.Add
         wsTemp.Name = "__tempSheet__"
-        With wsTemp
-            .range("A1").Value = pathTemplateWord.Value
-            .range("A2").Value = dirOut.Value
-            .range("A3").Value = chaves.Value
-            .range("A4").Value = valores.Value
-        End With
     Else
         Set wsTemp = ThisWorkbook.Worksheets("__tempSheet__")
-        With wsTemp
-            .range("A1").Value = pathTemplateWord.Value
-            .range("A2").Value = dirOut.Value
-            .range("A3").Value = chaves.Value
-            .range("A4").Value = valores.Value
-        End With
     End If
+    
+    ' Salva os campos do formulario
+    For Each c In Me.Controls
+        If TypeName(c) = "TextBox" Then
+            i = i + 1
+            wsTemp.Cells(i, "A").Value = c.Name
+            wsTemp.Cells(i, "B").Value = c.Value
+        End If
+    Next c
     
     wsAtiva.Activate
 End Sub
@@ -508,4 +522,33 @@ Private Function CorrigirEndereco(strRange As String) As String
     Else
         CorrigirEndereco = strRange
     End If
+End Function
+Private Function IsFileNameValid(fileName As String) As Boolean
+    Dim fso As Object
+    Dim tempFolder As String
+    Dim tempFilePath As String
+    
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    
+    ' Diretório temporário para testes (normalmente encontrado no Windows)
+    tempFolder = Environ("TEMP")
+    tempFilePath = fso.BuildPath(tempFolder, fileName)
+    
+    On Error Resume Next
+    ' Tenta criar o arquivo
+    Dim tempFile As Object
+    Set tempFile = fso.CreateTextFile(tempFilePath, True)
+    
+    ' Verifica se houve erro ao criar o arquivo
+    If Err.Number <> 0 Then
+        IsFileNameValid = False
+        Err.Clear
+    Else
+        ' Fecha e apaga o arquivo temporário, se foi criado com sucesso
+        IsFileNameValid = True
+        tempFile.Close
+        fso.DeleteFile tempFilePath
+    End If
+    
+    On Error GoTo 0
 End Function
