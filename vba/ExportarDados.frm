@@ -99,7 +99,7 @@ Private Sub SubstituirCamposArquivoWord(pathModel As String, fields As Object, d
     
     ' Substitui os campos no XML e salva
     If fso.FileExists(xmlFilePath) Then
-        Set xmlFile = fso.OpenTextFile(xmlFilePath, ForReading, False, -2)
+        Set xmlFile = fso.OpenTextFile(xmlFilePath, 1, False, -2)
         xmlContent = xmlFile.ReadAll: xmlFile.Close
         
         For Each campo In fields.Keys: xmlContent = Replace(xmlContent, campo, StringToEntities(fields(campo))): Next campo
